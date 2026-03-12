@@ -6,7 +6,7 @@ Group: Ragad Ziyada , Rasha Fadulallah, Lana Mukhtar
 Heart disease is the #1 cause of death globally (WHO). Early prediction can save lives.
 
 ## Solution
-Random Forest classifier (92% accuracy) deployed as an interactive Streamlit web app.  
+Random Forest classifier deployed as an interactive Streamlit web app.  
 Doctors/patients enter 13 medical parameters, instant prediction and explanation.
 
 ## How to Run

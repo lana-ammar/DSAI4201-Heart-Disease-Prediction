@@ -1,0 +1,17 @@
+{
+  "accuracy": 0.7704918032786885,
+  "precision": 0.7878787878787878,
+  "recall": 0.7878787878787878,
+  "f1": 0.7878787878787878,
+  "roc_auc": 0.8625541125541126,
+  "cv_roc_auc_mean": 0.9156796135962804,
+  "cv_roc_auc_std": 0.013482086742135515,
+  "rows_used": 302,
+  "best_params": {
+    "class_weight": "balanced",
+    "max_depth": 5,
+    "min_samples_leaf": 2,
+    "min_samples_split": 5,
+    "n_estimators": 400
+  }
+}
