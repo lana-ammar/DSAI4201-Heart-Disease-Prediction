@@ -13,4 +13,4 @@ Doctors/patients enter 13 medical parameters, instant prediction and explanation
 ```bash
 pip install -r requirements.txt
 python src/train_model.py
-streamlit run app.py
+streamlit run app.py #or python -m streamlit run app.py
