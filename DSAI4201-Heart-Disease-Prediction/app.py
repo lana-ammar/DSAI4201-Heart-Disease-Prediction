@@ -3,10 +3,9 @@ from pathlib import Path
 import time
 import numpy as np
 import joblib
-import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 import streamlit as st
+from lime.lime_tabular import LimeTabularExplainer
 from streamlit_option_menu import option_menu
 import plotly.graph_objects as go
 import plotly.express as px
@@ -163,6 +162,25 @@ st.markdown("""
 # Load model with animated loading
 MODEL_PATH = Path("models/heart_model.pkl")
 METRICS_PATH = Path("reports/metrics.json")
+DATA_PATH = Path("data/Heart Disease Dataset/heart.csv")
+MODEL_COMPARISON_PATH = Path("reports/model_comparison.csv")
+LIME_GLOBAL_IMPORTANCE_PATH = Path("reports/lime_global_importance.csv")
+
+FEATURE_NAMES = [
+    "age",
+    "sex",
+    "cp",
+    "trestbps",
+    "chol",
+    "fbs",
+    "restecg",
+    "thalach",
+    "exang",
+    "oldpeak",
+    "slope",
+    "ca",
+    "thal",
+]
 
 @st.cache_resource
 def load_model():
@@ -179,6 +197,32 @@ def load_model():
             return None, False
 
 model, model_loaded = load_model()
+
+
+@st.cache_data
+def load_training_data():
+    if not DATA_PATH.exists():
+        return None
+    df = pd.read_csv(DATA_PATH).drop_duplicates().drop_duplicates(subset=FEATURE_NAMES)
+    return df[FEATURE_NAMES]
+
+
+@st.cache_resource
+def load_lime_explainer():
+    training_data = load_training_data()
+    if training_data is None:
+        return None
+    return LimeTabularExplainer(
+        training_data=training_data.to_numpy(),
+        feature_names=FEATURE_NAMES,
+        class_names=["No Disease", "Disease"],
+        mode="classification",
+        discretize_continuous=True,
+        random_state=42,
+    )
+
+
+lime_explainer = load_lime_explainer() if model_loaded else None
 
 # Navigation menu
 with st.sidebar:
@@ -364,8 +408,7 @@ if selected == "Patient Assessment":
         input_data = pd.DataFrame(
             [[age, sex, cp, trestbps, chol, fbs, restecg,
               thalach, exang, oldpeak, slope, ca, thal]],
-            columns=["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg",
-                     "thalach", "exang", "oldpeak", "slope", "ca", "thal"],
+            columns=FEATURE_NAMES,
         )
         
         # Animated prediction
@@ -455,10 +498,13 @@ if selected == "Patient Assessment":
         # Feature importance visualization
         st.markdown("### 🔍 Top Factors Influencing This Prediction")
         
-        importance = pd.Series(
-            model.feature_importances_, 
-            index=input_data.columns
-        ).sort_values(ascending=False)
+        if hasattr(model, "feature_importances_"):
+            importance = pd.Series(
+                model.feature_importances_, 
+                index=input_data.columns
+            ).sort_values(ascending=False)
+        else:
+            importance = pd.Series(1 / len(FEATURE_NAMES), index=FEATURE_NAMES).sort_values(ascending=False)
         
         # Create horizontal bar chart with Plotly for interactivity
         fig = make_subplots(rows=1, cols=2, 
@@ -510,6 +556,39 @@ if selected == "Patient Assessment":
         fig.update_yaxes(title_text="Features", row=1, col=1)
         
         st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("### 🧠 LIME Local Explanation (Patient-Level)")
+        if lime_explainer is not None:
+            local_explanation = lime_explainer.explain_instance(
+                input_data.iloc[0].to_numpy(),
+                model.predict_proba,
+                num_features=8,
+            )
+            local_df = pd.DataFrame(
+                local_explanation.as_list(label=1),
+                columns=["Condition", "Contribution"],
+            ).sort_values("Contribution", ascending=True)
+
+            local_colors = np.where(local_df["Contribution"] >= 0, "#ff6b6b", "#51cf66")
+            lime_fig = go.Figure(
+                go.Bar(
+                    x=local_df["Contribution"],
+                    y=local_df["Condition"],
+                    orientation="h",
+                    marker_color=local_colors,
+                    text=[f"{x:.3f}" for x in local_df["Contribution"]],
+                    textposition="auto",
+                )
+            )
+            lime_fig.update_layout(
+                title="Positive bars increase predicted risk, negative bars reduce risk",
+                xaxis_title="LIME contribution to disease probability",
+                yaxis_title="Feature condition",
+                height=420,
+            )
+            st.plotly_chart(lime_fig, use_container_width=True)
+        else:
+            st.info("LIME explanation unavailable. Ensure dataset exists at data/Heart Disease Dataset/heart.csv.")
         
         # Recommendations based on risk level
         st.markdown("### 💡 Clinical Recommendations")
@@ -557,23 +636,86 @@ elif selected == "Model Insights":
             st.markdown("<div class='metric-card'><h3>Recall</h3><h2>{:.1%}</h2></div>".format(metrics['recall']), unsafe_allow_html=True)
         with col4:
             st.markdown("<div class='metric-card'><h3>F1 Score</h3><h2>{:.1%}</h2></div>".format(metrics['f1']), unsafe_allow_html=True)
-        
-        # Feature importance overview
-        st.markdown("### 🌟 Global Feature Importance")
-        if hasattr(model, 'feature_importances_'):
-            feature_names = ["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg",
-                           "thalach", "exang", "oldpeak", "slope", "ca", "thal"]
-            
-            importance_df = pd.DataFrame({
-                'Feature': feature_names,
-                'Importance': model.feature_importances_
-            }).sort_values('Importance', ascending=True)
-            
-            fig = px.bar(importance_df, x='Importance', y='Feature',
-                        orientation='h', title="Global Feature Importance",
-                        color='Importance', color_continuous_scale='Viridis')
-            fig.update_layout(height=500)
+
+        if "deployment_model" in metrics:
+            st.info(f"Deployment model: {metrics['deployment_model']}")
+
+        if "pr_auc" in metrics or "brier" in metrics:
+            col5, col6 = st.columns(2)
+            with col5:
+                if "pr_auc" in metrics:
+                    st.metric("PR-AUC", f"{metrics['pr_auc']:.3f}")
+            with col6:
+                if "brier" in metrics:
+                    st.metric("Brier Score", f"{metrics['brier']:.3f}")
+
+        st.markdown("### ⚖️ Model Comparison Benchmark")
+        if MODEL_COMPARISON_PATH.exists():
+            comparison_df = pd.read_csv(MODEL_COMPARISON_PATH)
+            st.dataframe(
+                comparison_df[
+                    [
+                        "model",
+                        "cv_roc_auc_mean",
+                        "test_roc_auc",
+                        "test_pr_auc",
+                        "test_accuracy",
+                        "cv_test_roc_auc_gap",
+                    ]
+                ].round(4),
+                use_container_width=True,
+            )
+
+            fig = px.bar(
+                comparison_df.sort_values("test_roc_auc", ascending=True),
+                x="test_roc_auc",
+                y="model",
+                orientation="h",
+                color="cv_test_roc_auc_gap",
+                color_continuous_scale="RdYlGn_r",
+                title="Test ROC-AUC by model (color indicates CV-Test gap)",
+            )
+            fig.update_layout(height=420, xaxis_title="Test ROC-AUC", yaxis_title="Model")
             st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("model_comparison.csv not found. Re-run training to generate benchmark results.")
+
+        st.markdown("### 🌟 Global Feature Importance (Permutation)")
+        if hasattr(model, "feature_importances_"):
+            importance_df = pd.DataFrame(
+                {"Feature": FEATURE_NAMES, "Importance": model.feature_importances_}
+            ).sort_values("Importance", ascending=True)
+
+            fig = px.bar(
+                importance_df,
+                x="Importance",
+                y="Feature",
+                orientation="h",
+                color="Importance",
+                color_continuous_scale="Viridis",
+                title="Random Forest Feature Importance",
+            )
+            fig.update_layout(height=420)
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("### 🔬 Global LIME Importance")
+        if LIME_GLOBAL_IMPORTANCE_PATH.exists():
+            lime_global_df = pd.read_csv(LIME_GLOBAL_IMPORTANCE_PATH).sort_values(
+                "mean_abs_lime_weight", ascending=True
+            )
+            lime_fig = px.bar(
+                lime_global_df,
+                x="mean_abs_lime_weight",
+                y="feature",
+                orientation="h",
+                color="mean_abs_lime_weight",
+                color_continuous_scale="Blues",
+                title="Mean absolute LIME contribution (sampled test patients)",
+            )
+            lime_fig.update_layout(height=420, xaxis_title="Mean |LIME weight|")
+            st.plotly_chart(lime_fig, use_container_width=True)
+        else:
+            st.warning("lime_global_importance.csv not found. Re-run training to generate LIME global insights.")
     else:
         st.warning("Model metrics not available. Please train the model first.")
 
@@ -652,14 +794,17 @@ else:  # About
         ### Features
         - **Real-time Risk Assessment**: Instant analysis of patient data
         - **Interactive Visualizations**: Clear presentation of risk factors
-        - **Feature Importance Analysis**: Understand which factors most influence predictions
+        - **Local LIME Explanation**: Patient-level explanation for each prediction
+        - **Model Benchmarking**: Compare Random Forest, Logistic Regression, and Gradient Boosting
+        - **Global Importance Analysis**: Permutation and LIME-based feature ranking
         - **Clinical Recommendations**: Evidence-based guidelines based on risk level
         - **Model Performance Metrics**: Transparent display of model accuracy
         
         ### Technology Stack
         - **Frontend**: Streamlit with custom CSS animations
-        - **ML Model**: Random Forest Classifier (scikit-learn)
-        - **Visualizations**: Plotly, Matplotlib, Seaborn
+        - **ML Models**: Random Forest, Logistic Regression, Gradient Boosting (scikit-learn)
+        - **Explainability**: LIME + permutation importance
+        - **Visualizations**: Plotly
         - **Data Processing**: Pandas, NumPy
         """)
     

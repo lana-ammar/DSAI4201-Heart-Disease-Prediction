@@ -1,124 +1,87 @@
 # AI-Powered Heart Disease Prediction System
-**DSAI4201 Course Project**  
-Group: 
-Ragad Ziyada - 60301042 , Rasha Fadulallah - 60301813, Lana Mukhtar - 60107216
+**DSAI4201 Course Project**
 
+Group:
+- Ragad Ziyada - 60301042
+- Rasha Fadulallah - 60301813
+- Lana Mukhtar - 60107216
 
-##  Problem
+## Problem
+Heart disease is a leading global cause of death. Early risk screening can improve outcomes, but access to specialist evaluation is not always immediate.
 
-Heart disease is the **#1 cause of death globally**, responsible for ~17.9 million deaths per year (WHO). Early detection dramatically improves patient outcomes, but traditional screening requires specialist expertise and is not always accessible.
+## Solution
+This project provides an end-to-end ML pipeline and Streamlit app for heart disease risk prediction from 13 clinical features.
 
-##  Solution
+This upgraded version adds:
+- Model benchmarking (Random Forest vs Logistic Regression vs Gradient Boosting).
+- Local interpretability with LIME for each patient prediction.
+- Global interpretability with permutation importance and aggregated LIME importance.
+- Better overfitting visibility via CV-test ROC-AUC gap tracking.
 
-A **Random Forest classifier** trained on 13 clinical measurements that predicts heart disease risk with a cross-validated ROC-AUC. Deployed as an interactive Streamlit web app, doctors or patients enter values and receive an instant risk assessment with explanation.
-
----
-
-## Model Performance
-
-| Metric | Score |
-|--------|-------|
-| Accuracy | 77.0% |
-| Precision | 78.8% |
-| Recall | 78.8% |
-| F1 Score | 78.8% |
-| ROC-AUC (test) | 0.863 |
-| ROC-AUC (CV mean ± std) | 0.916 ± 0.013 |
-
----
+## Performance Reporting
+The pipeline reports:
+- Accuracy, Precision, Recall, F1
+- ROC-AUC and PR-AUC
+- Brier score
+- Cross-validated ROC-AUC mean and std
+- Multi-model comparison table in `reports/model_comparison.csv`
 
 ## Repository Structure
-
-```
+```text
 ├── data/
 │   └── Heart Disease Dataset/
-│       └── heart.csv           # Raw dataset (download from Kaggle)
+│       └── heart.csv
 ├── src/
-│   └── train_model.py          # Training pipeline
+│   └── train_model.py
 ├── models/
-│   ├── heart_model.pkl         # Trained model (generated after training)
-│   └── features.json           # Feature list
+│   ├── heart_model.pkl
+│   └── features.json
 ├── reports/
-│   ├── metrics.json            # Evaluation metrics
-│   ├── feature_importance.csv  # Permutation importance scores
-│   └── data_source.txt         # Data provenance
-├── app.py                      # Streamlit web application
-├── requirements.txt            # Python dependencies
+│   ├── metrics.json
+│   ├── model_comparison.csv
+│   ├── feature_importance.csv
+│   ├── lime_global_importance.csv
+│   └── data_source.txt
+├── app.py
+├── requirements.txt
 └── README.md
 ```
 
----
-
-## ⚙️ How to Run
-
-### 1. Clone the repository
-```bash
-git clone <https://github.com/lana-ammar/DSAI4201-Heart-Disease-Prediction>
-cd DSAI4201-HEART-DISEASE-PREDICTION
-```
-
-### 2. Install dependencies
+## How to Run
+1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Download the dataset
-Download `heart.csv` from [Kaggle](https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset) and place it at:
-```
+2. Place dataset file at:
+```text
 data/Heart Disease Dataset/heart.csv
 ```
 
-### 4. Train the model
+3. Train and generate artifacts:
 ```bash
 python src/train_model.py
 ```
-This will save the trained model to `models/` and evaluation reports to `reports/`.
 
-### 5. Launch the app
+4. Launch the app:
 ```bash
 streamlit run app.py
 ```
-Open your browser at `http://localhost:8501`
 
----
+## What Was Added for Depth
+1. Comparison extension:
+- Instead of only one tuned model, the project now compares three model families with the same evaluation protocol.
+- Results are saved and viewable in the app under Model Insights.
 
-## Input Features
+2. Interpretability extension:
+- Local LIME explanation appears for each patient prediction.
+- Global LIME summary is generated to complement permutation importance.
 
-| Feature | Description |
-|---------|-------------|
-| age | Patient age (years) |
-| sex | Biological sex (0 = Female, 1 = Male) |
-| cp | Chest pain type (0–3) |
-| trestbps | Resting blood pressure (mm Hg) |
-| chol | Serum cholesterol (mg/dl) |
-| fbs | Fasting blood sugar > 120 mg/dl |
-| restecg | Resting ECG results (0–2) |
-| thalach | Max heart rate achieved |
-| exang | Exercise-induced angina |
-| oldpeak | ST depression (exercise vs rest) |
-| slope | Slope of peak exercise ST segment |
-| ca | Major vessels coloured by fluoroscopy (0–3) |
-| thal | Thalassemia type (1–3) |
+These additions directly address the feedback about technical depth and novelty.
 
----
-
-## How It Works
-
-1. **Data Cleaning** — duplicates removed, column validation performed
-2. **Hyperparameter Tuning** — 5-fold stratified GridSearchCV over 48 parameter combinations, optimising ROC-AUC
-3. **Evaluation** — test set metrics + separate 5-fold cross-validation for robust generalisation estimate
-4. **Explainability** — permutation importance computed on held-out test set to show which features drive each prediction
-
----
-
-##  Disclaimer
-
-This tool is for **clinical decision support only**. It is not a substitute for professional medical diagnosis. Always consult a qualified doctor.
-
----
+## Disclaimer
+This tool is for educational and decision-support purposes only. It is not a substitute for professional clinical diagnosis.
 
 ## Data Source
-
-- Dataset: [Heart Disease Dataset — Kaggle](https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset)
+- Kaggle Heart Disease Dataset: https://www.kaggle.com/datasets/johnsmith88/heart-disease-dataset
 - Original source: Cleveland Clinic Foundation (UCI Heart Disease Repository)
-- Detrano, R., et al. (1989). *American Journal of Cardiology*, 64(5), 304–310.
