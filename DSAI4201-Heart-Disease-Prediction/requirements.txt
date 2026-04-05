@@ -6,3 +6,13 @@ joblib
 plotly
 streamlit-option-menu
 lime
+shap 
+xgboost 
+streamlit 
+streamlit-option-menu 
+plotly 
+pandas 
+numpy 
+joblib 
+matplotlib 
+scikit-learn

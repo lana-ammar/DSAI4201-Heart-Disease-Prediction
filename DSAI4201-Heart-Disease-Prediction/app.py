@@ -197,6 +197,8 @@ def load_model():
             return None, False
 
 model, model_loaded = load_model()
+model_classes = list(model.classes_) if model_loaded and hasattr(model, "classes_") else []
+DISEASE_CLASS_LABEL = 0
 
 
 @st.cache_data
@@ -239,6 +241,8 @@ with st.sidebar:
             "nav-link-selected": {"background-color": "#667eea"},
         }
     )
+    if model_classes:
+        st.caption(f"Model classes detected: {model_classes}")
     
     st.markdown("---")
     
@@ -377,7 +381,7 @@ if selected == "Patient Assessment":
         format_func=lambda x: ["📈 Upsloping", "➡️ Flat", "📉 Downsloping"][x],
         help="Slope of the peak exercise ST segment"
     )
-    
+
     # History Section (kept at bottom)
     st.markdown("---")
     st.markdown("### Previous Assessments")
@@ -415,7 +419,14 @@ if selected == "Patient Assessment":
         with st.spinner('🧠 AI is analyzing patient data...'):
             time.sleep(1.5)
             prediction = model.predict(input_data)[0]
-            probability = model.predict_proba(input_data)[0][1]
+            proba = model.predict_proba(input_data)[0]
+            disease_label = (
+                DISEASE_CLASS_LABEL
+                if DISEASE_CLASS_LABEL in model_classes
+                else (1 if 1 in model_classes else model_classes[-1] if model_classes else 1)
+            )
+            disease_index = model_classes.index(disease_label) if model_classes else 1
+            probability = float(proba[disease_index])
         
         # Display results with stunning visuals
         st.markdown("## 🎯 Analysis Results")
@@ -465,6 +476,15 @@ if selected == "Patient Assessment":
                                 font_size=20, showarrow=False)]
             )
             st.plotly_chart(fig, use_container_width=True)
+
+        if model_classes:
+            probability_text = ", ".join(
+                [f"class {cls}: {proba[idx]:.1%}" for idx, cls in enumerate(model_classes)]
+            )
+            st.caption(
+                f"Raw model probabilities -> {probability_text}. "
+                f"Current disease label mapping: class {disease_label}."
+            )
         
         # Risk gauge with animation
         st.markdown("### 📊 Risk Assessment Gauge")
@@ -565,7 +585,7 @@ if selected == "Patient Assessment":
                 num_features=8,
             )
             local_df = pd.DataFrame(
-                local_explanation.as_list(label=1),
+                local_explanation.as_list(label=disease_index),
                 columns=["Condition", "Contribution"],
             ).sort_values("Contribution", ascending=True)
 
